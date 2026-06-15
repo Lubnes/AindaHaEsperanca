@@ -39,6 +39,7 @@ var was_treated: bool = false
 var was_examined: bool = false
 var is_waiting: bool = true
 var sprite_path: String = ""
+var shadow_delivered: bool = false
 
 static func from_dict(data: Dictionary) -> Patient:
 	var patient := Patient.new()
@@ -247,3 +248,23 @@ func is_resolved() -> bool:
 		HealthState.RECOVERED,
 		HealthState.STABILIZED,
 	]
+
+
+func get_shadow_update_text() -> String:
+	match current_health_state:
+		HealthState.RECOVERED:
+			return "Me recuperei. Obrigado pelos seus cuidados, doutor."
+		HealthState.STABILIZED:
+			return "Ainda não estou bem, mas a mistura ajudou. Vou resistir."
+		HealthState.STABLE:
+			return "Continuo igual. A doença não avançou, mas também não passou."
+		HealthState.WEAK:
+			return "Estou fraco. Mal consigo me levantar da cama."
+		HealthState.WORSENED:
+			return "Piorei desde que saí daqui. A dor não para de crescer."
+		HealthState.CRITICAL:
+			return "Não tenho muito tempo. A febre não cede, doutor."
+		HealthState.DEAD:
+			return "..."
+		_:
+			return "Os dias têm sido difíceis."

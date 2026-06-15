@@ -116,6 +116,12 @@ func progress_all_patients() -> void:
 	if current_patient != null:
 		_progress_patient(current_patient)
 
+	for patient in treated_patients:
+		_progress_patient(patient)
+
+	for patient in refused_patients:
+		_progress_patient(patient)
+
 
 func has_current_patient() -> bool:
 	return current_patient != null
@@ -209,6 +215,22 @@ func _progress_patient(patient: Patient) -> void:
 
 	if patient.current_health_state == Patient.HealthState.DEAD:
 		_add_unique_patient(dead_patients, patient)
+
+
+func get_undelivered_shadow_patients() -> Array[Patient]:
+	var patients: Array[Patient] = []
+
+	for patient in treated_patients:
+		if not patient.shadow_delivered:
+			patient.shadow_delivered = true
+			patients.append(patient)
+
+	for patient in refused_patients:
+		if not patient.shadow_delivered:
+			patient.shadow_delivered = true
+			patients.append(patient)
+
+	return patients
 
 
 func _add_unique_patient(target: Array[Patient], patient: Patient) -> void:

@@ -35,6 +35,8 @@ var final_summary_written: bool = false
 
 var current_patient_examined: bool = false
 
+var pending_shadow_updates: Array[Patient] = []
+
 func _ready() -> void:
 	_setup_managers()
 	_load_static_data()
@@ -50,6 +52,7 @@ func start_new_game() -> void:
 	diary_summaries_by_day.clear()
 	current_day_actions.clear()
 	current_day_patient_results.clear()
+	pending_shadow_updates.clear()
 
 	time_manager.reset()
 	resource_manager.reset()
@@ -216,6 +219,8 @@ func end_day() -> void:
 	if game_finished:
 		get_tree().change_scene_to_file(DIARY_SCENE_PATH)
 		return
+
+	_gather_shadow_updates()
 
 	current_day_actions.clear()
 	current_day_patient_results.clear()
@@ -506,6 +511,20 @@ func _write_game_over_summary() -> void:
 	text += "Pontuação final: 0/100"
 
 	add_diary_entry(text)
+
+
+func _gather_shadow_updates() -> void:
+	pending_shadow_updates = patient_manager.get_undelivered_shadow_patients()
+
+
+func has_pending_shadow_updates() -> bool:
+	return not pending_shadow_updates.is_empty()
+
+
+func pop_shadow_update() -> Patient:
+	if pending_shadow_updates.is_empty():
+		return null
+	return pending_shadow_updates.pop_front()
 
 
 func _describe_combination(combination: Dictionary) -> String:

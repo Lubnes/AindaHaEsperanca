@@ -56,6 +56,8 @@ var current_mixture := {
 
 var is_typing_speech := false
 var showing_examined_dialogue := false
+var showing_shadow := false
+var _current_shadow_patient: Patient = null
 
 
 func _ready() -> void:
@@ -97,6 +99,7 @@ func _ready() -> void:
 	_configure_button_texts()
 	_connect_game_state_signals()
 	_update_ui()
+	_check_pending_shadows()
 
 
 func _configure_button_texts() -> void:
@@ -123,6 +126,9 @@ func _on_world_diary_pressed() -> void:
 	
 	
 func _on_patient_changed(_patient = null) -> void:
+	if showing_shadow:
+		return
+
 	showing_examined_dialogue = false
 
 	examine_button.visible = true
@@ -217,6 +223,9 @@ func _update_resource_label() -> void:
 
 
 func _update_patient_panel() -> void:
+	if showing_shadow:
+		return
+
 	var patient := GameState.get_current_patient()
 
 	if patient == null:
@@ -308,7 +317,49 @@ func _show_patient_speech() -> void:
 	await _type_patient_text(text)
 	
 		
+func _check_pending_shadows() -> void:
+	if not GameState.has_pending_shadow_updates():
+		return
+	_show_next_shadow()
+
+
+func _show_next_shadow() -> void:
+	if not GameState.has_pending_shadow_updates():
+		showing_shadow = false
+		_current_shadow_patient = null
+		patient_sprite.modulate = Color.WHITE
+		examine_button.text = "Examinar paciente"
+		examine_button.visible = true
+		speech_bubble.visible = false
+		_update_ui()
+		return
+
+	showing_shadow = true
+	_current_shadow_patient = GameState.pop_shadow_update()
+
+	_set_patient_buttons_enabled(false)
+
+	if not _current_shadow_patient.sprite_path.strip_edges().is_empty():
+		var texture := load(_current_shadow_patient.sprite_path)
+		if texture != null:
+			patient_sprite.texture = texture
+
+	patient_sprite.modulate = Color(0.08, 0.08, 0.12, 0.85)
+	patient_display.visible = true
+
+	examine_button.text = "Continuar"
+	examine_button.visible = true
+
+	_animate_speech_bubble()
+	speech_text.text = _current_shadow_patient.get_shadow_update_text()
+	speech_bubble.visible = true
+
+
 func _on_examine_patient_pressed() -> void:
+	if showing_shadow:
+		_show_next_shadow()
+		return
+
 	var patient := GameState.get_current_patient()
 
 	if patient == null:
