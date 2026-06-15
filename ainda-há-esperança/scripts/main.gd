@@ -96,6 +96,7 @@ func _ready() -> void:
 
 	_configure_button_texts()
 	_connect_game_state_signals()
+	_apply_game_fonts()
 	_update_ui()
 
 
@@ -200,11 +201,7 @@ func _update_ui(_value = null) -> void:
 
 
 func _update_day_and_time_labels() -> void:
-	day_label.text = "Dia %d de %d" % [
-		GameState.get_current_day(),
-		GameState.time_manager.max_days,
-	]
-
+	day_label.text = GameState.get_current_day_name()
 	time_label.text = "Horário: %02d:00" % GameState.get_current_hour()
 
 
@@ -253,10 +250,23 @@ func _update_mixture_label() -> void:
 
 func _set_patient_buttons_enabled(enabled: bool) -> void:
 	var mixture_total := _get_current_mixture_total()
+	var mixture_full := mixture_total >= 3
 
-	add_artemisia_button.disabled = not enabled or mixture_total >= 3
-	add_valeriana_button.disabled = not enabled or mixture_total >= 3
-	add_salvia_button.disabled = not enabled or mixture_total >= 3
+	var artemisia_in_mixture := int(current_mixture[ResourceManager.ARTEMISIA])
+	var valeriana_in_mixture := int(current_mixture[ResourceManager.VALERIANA])
+	var salvia_in_mixture := int(current_mixture[ResourceManager.SALVIA])
+
+	add_artemisia_button.disabled = not enabled \
+		or mixture_full \
+		or artemisia_in_mixture >= GameState.get_artemisia()
+
+	add_valeriana_button.disabled = not enabled \
+		or mixture_full \
+		or valeriana_in_mixture >= GameState.get_valeriana()
+
+	add_salvia_button.disabled = not enabled \
+		or mixture_full \
+		or salvia_in_mixture >= GameState.get_salvia()
 
 	apply_mixture_button.disabled = not enabled or mixture_total != 3
 	clear_mixture_button.disabled = mixture_total == 0
@@ -265,18 +275,41 @@ func _set_patient_buttons_enabled(enabled: bool) -> void:
 
 
 func _show_day_summary(day: int) -> void:
-	selected_day_label.text = "Diário - Dia %d" % day
+	selected_day_label.text = "Diário - %s" % GameState.get_day_name(day)
 
 	var summary := GameState.get_day_summary(day)
 
 	if summary.is_empty():
 		day_log_label.text = "O registro deste dia ainda não foi finalizado."
 	else:
-		day_log_label.text = summary
+		day_log_label.text = _remove_diary_title_from_summary(summary)
 
 	current_info_container.visible = false
 	day_log_container.visible = true
 
+
+func _remove_diary_title_from_summary(summary: String) -> String:
+	var clean_summary := summary.strip_edges()
+
+	if clean_summary.is_empty():
+		return ""
+
+	var lines := clean_summary.split("\n")
+
+	if lines.is_empty():
+		return clean_summary
+
+	var first_line := str(lines[0]).strip_edges()
+
+	if first_line.begins_with("Diário - "):
+		lines.remove_at(0)
+
+		while not lines.is_empty() and str(lines[0]).strip_edges().is_empty():
+			lines.remove_at(0)
+
+		return "\n".join(lines)
+
+	return clean_summary
 func _on_patient_sprite_clicked(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_show_patient_speech()
@@ -382,6 +415,8 @@ func _small_bubble_bounce() -> void:
 func _show_current_info() -> void:
 	current_info_container.visible = true
 	day_log_container.visible = false
+	selected_day_label.text = ""
+	day_log_label.text = ""
 	_update_ui()
 
 func _on_page_back_button_pressed() -> void:
@@ -396,12 +431,32 @@ func _get_current_mixture_total() -> int:
 		+ int(current_mixture[ResourceManager.SALVIA])
 
 
+func _get_available_herb_amount(herb_name: String) -> int:
+	match herb_name:
+		ResourceManager.ARTEMISIA:
+			return GameState.get_artemisia()
+		ResourceManager.VALERIANA:
+			return GameState.get_valeriana()
+		ResourceManager.SALVIA:
+			return GameState.get_salvia()
+		_:
+			return 0
+
 
 func _add_herb_to_mixture(herb_name: String) -> void:
 	if _get_current_mixture_total() >= 3:
 		return
 
-	current_mixture[herb_name] = int(current_mixture[herb_name]) + 1
+	if not current_mixture.has(herb_name):
+		return
+
+	var current_amount_in_mixture := int(current_mixture[herb_name])
+	var available_amount := _get_available_herb_amount(herb_name)
+
+	if current_amount_in_mixture >= available_amount:
+		return
+
+	current_mixture[herb_name] = current_amount_in_mixture + 1
 	_update_ui()
 
 
@@ -432,8 +487,12 @@ func _on_apply_mixture_pressed() -> void:
 	if _get_current_mixture_total() != 3:
 		return
 
-	GameState.treat_current_patient_with_combination(current_mixture.duplicate(true))
-	_clear_mixture()
+	var treatment_applied := GameState.treat_current_patient_with_combination(current_mixture.duplicate(true))
+
+	if treatment_applied:
+		_clear_mixture()
+	else:
+		_update_ui()
 
 
 func _on_clear_mixture_pressed() -> void:
@@ -447,6 +506,7 @@ func _on_refuse_pressed() -> void:
 
 func _on_collect_herbs_pressed() -> void:
 	GameState.collect_herbs()
+	_update_ui()
 
 
 func _on_rest_pressed() -> void:
@@ -456,3 +516,48 @@ func _on_rest_pressed() -> void:
 
 func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu.tscn")
+
+
+func _apply_game_fonts() -> void:
+	MainFontApplier.apply_main_fonts(
+		day_label,
+		time_label,
+		resources_label,
+		patient_label,
+		symptoms_label,
+		mixture_label,
+		selected_day_label,
+		day_log_label,
+		speech_text,
+		_get_action_buttons(),
+		_get_bookmark_buttons()
+	)
+
+
+func _get_action_buttons() -> Array[Button]:
+	return [
+		diary_button,
+		add_artemisia_button,
+		add_valeriana_button,
+		add_salvia_button,
+		apply_mixture_button,
+		clear_mixture_button,
+		refuse_button,
+		collect_herbs_button,
+		rest_button,
+		back_button,
+		page_back_button,
+		examine_button,
+	]
+
+
+func _get_bookmark_buttons() -> Array[Button]:
+	return [
+		page_1,
+		page_2,
+		page_3,
+		page_4,
+		page_5,
+		page_6,
+		page_7,
+	]
