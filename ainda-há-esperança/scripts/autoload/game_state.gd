@@ -17,6 +17,7 @@ const FAMILY_JSON_PATH := "res://data/characters/family.json"
 const DISEASES_JSON_PATH := "res://data/characters/diseases.json"
 
 const REQUIRED_HERB_TOTAL := 3
+const VICTORY_SCORE_THRESHOLD := 50
 
 var patient_manager: PatientManager
 var resource_manager: ResourceManager
@@ -101,11 +102,19 @@ func get_salvia() -> int:
 func get_diary_title() -> String:
 	if game_finished:
 		if patient_manager.get_survived_count() <= 0:
-			return "Game Over"
+			return "Derrota"
 
-		return "Fim da Semana"
+		if _get_final_score() >= VICTORY_SCORE_THRESHOLD:
+			return "Vitória"
+
+		return "Derrota"
 
 	return "Diário"
+
+
+func _get_final_score() -> int:
+	var stats := patient_manager.get_final_statistics()
+	return _calculate_final_score(int(stats["survived"]), int(stats["dead"]), int(stats["total"]))
 
 
 func get_diary_entries_newest_first() -> Array[String]:
@@ -436,6 +445,7 @@ func _write_final_week_summary() -> void:
 	var survived_count := int(stats["survived"])
 	var dead_count := int(stats["dead"])
 	var total_count := int(stats["total"])
+	var score := _calculate_final_score(survived_count, dead_count, total_count)
 
 	var text := "Diário - Fim da Semana\n\n"
 	text += "Sete dias se passaram desde que comecei a atender os doentes desta vila.\n\n"
@@ -455,7 +465,12 @@ func _write_final_week_summary() -> void:
 	else:
 		text += "Nem todos sobreviveram, mas houve esperança. Algumas vidas continuaram por causa das suas escolhas.\n\n"
 
-	text += "Pontuação final: %d/100" % _calculate_final_score(survived_count, dead_count, total_count)
+	text += "Pontuação final: %d/100\n\n" % score
+
+	if score >= VICTORY_SCORE_THRESHOLD:
+		text += "VITÓRIA: a vila resistiu mais uma semana graças aos seus cuidados."
+	else:
+		text += "DERROTA: a peste cobrou um preço alto demais nesta semana."
 
 	add_diary_entry(text)
 
@@ -496,14 +511,15 @@ func _write_game_over_summary() -> void:
 	var dead_count := patient_manager.get_dead_count()
 	var total_count := patient_manager.get_total_campaign_patients_count()
 
-	var text := "Diário - Game Over\n\n"
+	var text := "Diário - Derrota\n\n"
 	text += "O último paciente morreu.\n\n"
 	text += "Não há mais ninguém para salvar. A peste venceu antes do fim da semana.\n\n"
 	text += "Resultado final:\n"
 	text += "- Sobreviventes: 0\n"
 	text += "- Mortos: %d\n" % dead_count
 	text += "- Total de pacientes: %d\n\n" % total_count
-	text += "Pontuação final: 0/100"
+	text += "Pontuação final: 0/100\n\n"
+	text += "DERROTA: a peste venceu antes do fim da semana."
 
 	add_diary_entry(text)
 
